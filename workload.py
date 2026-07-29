@@ -262,6 +262,15 @@ with tab2:
     st.subheader("Detail Daftar Aktivitas & Beban Kuantitatif")
     df_editor = pd.DataFrame(active_tasks)
     st.dataframe(df_editor, use_container_width=True)
+    
+    # Pasang tombol download di bawah tabel
+    excel_bytes = convert_df_to_excel(df_editor)
+    st.download_button(
+        label="📥 Unduh Tabel Ini (Excel .xlsx)",
+        data=excel_bytes,
+        file_name="Data_Aktivitas_HWAS.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # ------------------------------------------
 # TAB 3: ANALISIS PSIKOLOGIS TLX
