@@ -4,7 +4,15 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-
+# ==========================================
+# FUNGSI HELPER CONVERT TO EXCEL
+# ==========================================
+def convert_df_to_excel(df_to_download):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_to_download.to_excel(writer, index=False, sheet_name='Hasil_WLA')
+    processed_data = output.getvalue()
+    return processed_data
 # ==========================================
 # 1. KONFIGURASI HALAMAN STREAMLIT
 # ==========================================
@@ -268,17 +276,38 @@ with tab3:
 # TAB 4: LAPORAN MANAJERIAL
 # ------------------------------------------
 with tab4:
-    st.subheader("Rekomendasi & Intervensi Manajerial")
+    st.subheader("📋 Rekomendasi & Intervensi Manajerial")
     st.markdown(f"**Diagnosis Posisi:** {kuadran_text}")
     
+    # Narasi Evaluasi Beban Fisik
     if total_fte > 1.28:
-        st.error("⚠️ **Rekomendasi Beban Fisik:** Posisi ini mengalami *Overload*. Diperlukan rekrutmen SDM tambahan atau redistribusi alur kerja.")
+        st.error("⚠️ **Rekomendasi Beban Fisik:** Posisi ini mengalami *Overload* (FTE > 1.28). Diperlukan rekrutmen SDM tambahan atau redistribusi alur kerja.")
     elif total_fte < 1.00:
-        st.warning("ℹ️ **Rekomendasi Beban Fisik:** Posisi ini *Under-utilized*. Lakukan *job enrichment* atau penambahan cakupan tugas.")
+        st.warning("ℹ️ **Rekomendasi Beban Fisik:** Posisi ini *Under-utilized* (FTE < 1.00). Lakukan *job enrichment* atau penambahan cakupan tugas.")
     else:
-        st.success("✅ **Rekomendasi Beban Fisik:** Kapasitas fisik berada pada rentang ideal.")
+        st.success("✅ **Rekomendasi Beban Fisik:** Kapasitas fisik berada pada rentang ideal (1.00 - 1.28).")
         
+    # Narasi Evaluasi Beban Mental
     if skor_tlx_avg > 66.66:
-        st.error("⚠️ **Rekomendasi Beban Mental:** Stres psikologis tinggi. Lakukan evaluasi birokrasi, otomatisasi sistem, atau perbaikan sarana kerja.")
+        st.error("⚠️ **Rekomendasi Beban Mental:** Stres psikologis tinggi (> 66.66). Lakukan evaluasi birokrasi, otomatisasi sistem, atau perbaikan sarana kerja.")
     else:
-        st.success("✅ **Rekomendasi Beban Mental:** Tingkat stres psikologis dalam kondisi wajar/terkendali.")
+        st.success("✅ **Rekomendasi Beban Mental:** Tingkat stres psikologis dalam kondisi wajar/terkendali (<= 66.66).")
+
+    # --------------------------------------
+    # BAGIAN TOMBOL DOWNLOAD EXCEL (DI SINI TEMPATNYA)
+    # --------------------------------------
+    st.markdown("---")
+    st.subheader("📥 Ekspor Rekap Data WLA")
+    st.caption("Unduh berkas Excel berisi seluruh rincian kalkulasi aktivitas, FTE, dan parameter NASA-TLX.")
+    
+    # 1. Konversi active_tasks ke DataFrame lalu ke biner Excel
+    df_download = pd.DataFrame(active_tasks)
+    excel_bytes = convert_df_to_excel(df_download)
+    
+    # 2. Tombol Unduh
+    st.download_button(
+        label="📊 Download Hasil Analisis (Excel .xlsx)",
+        data=excel_bytes,
+        file_name="Hasil_Analisis_HWAS.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
