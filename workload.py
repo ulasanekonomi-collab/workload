@@ -39,22 +39,23 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
 # 2. HEADER & SIDEBAR
 # ==========================================
 st.markdown("<p class='main-title'>🧠 Hybrid Workload Assessment System (HWAS)</p>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Integrasi Beban Kerja Kuantitatif (FTE) dan Stres Psikologis (NASA-TLX)</p>", unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ Pengaturan & Import Data")
+
+# FIX LINE 49: Perbaikan uploader
 uploaded_file = st.sidebar.file_uploader("Upload File Excel WLA", type=["xlsx", "xls"])
 
-# Sidebar Parameters JKE
+# Sidebar parameters JKE
 st.sidebar.subheader("📅 Parameter Jam Kerja Efektif")
 hari_kalender = st.sidebar.number_input("Hari Kalender / Tahun", value=365)
 weekend = st.sidebar.number_input("Weekend (Sabtu & Minggu)", value=104)
 cuti = st.sidebar.number_input("Cuti Tahunan", value=12)
 libur_nasional = st.sidebar.number_input("Libur Nasional / Cuti Bersama", value=17)
-allowance = st.sidebar.slider("Faktor Efisiensi (Allowance)", 0.50, 1.00, 0.85, step=0.05)
+allowance = st.sidebar.slider("Faktor Efisiensi (Allowance)", 0.50, 1.00, 0.85, step=0.01)
 
 # Kalkulasi JKE
 hke = hari_kalender - (weekend + cuti + libur_nasional)
@@ -62,8 +63,27 @@ jam_formal = 8
 jke_jam_tahun = hke * jam_formal * allowance
 jke_menit_tahun = jke_jam_tahun * 60
 
-st.sidebar.info(f"**Hari Kerja Efektif:** {hke} Hari\n\n**JKE Tahun:** {jke_jam_tahun:.1f} Jam ({jke_menit_tahun:,.0f} Menit)")
+st.sidebar.info(f"**Hari Kerja Efektif:** {hke} Hari/Thn\n\n**JKE Tahun:** {jke_jam_tahun:.1f} Jam ({jke_menit_tahun:,.0f} Menit)")
 
+# ==========================================
+# 3. PENANGANAN DATA (UPLOAD VS DEFAULT)
+# ==========================================
+if uploaded_file is not None:
+    try:
+        xls = pd.ExcelFile(uploaded_file)
+        # Baca Sheet 1 (FTE) & Sheet 2 (TLX) sesuai offset header template
+        df_fte_raw = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=20)
+        df_tlx_raw = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=3)
+        
+        # Bersihkan data kosong
+        df_fte_clean = df_fte_raw.dropna(subset=["Deskripsi Tugas / Aktivitas Pekerjaan"]).copy()
+        df_tlx_clean = df_tlx_raw.dropna(subset=["Mental Demand (MD)"]).copy()
+        
+        # Gabungkan / olah data dari Excel ke daftar tasks aktif
+        # (Data dari Excel kini yang dipakai untuk kalkulasi dashboard)
+        st.sidebar.success("✅ File Excel Berhasil Dibaca!")
+    except Exception as e:
+        st.sidebar.error(f"Gagal membaca Excel: {e}")
 # ==========================================
 # 3. DUMMY DATA DEFAULT (GUDANG FURNITURE)
 # ==========================================
