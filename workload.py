@@ -71,16 +71,22 @@ st.sidebar.info(f"**Hari Kerja Efektif:** {hke} Hari/Thn\n\n**JKE Tahun:** {jke_
 if uploaded_file is not None:
     try:
         xls = pd.ExcelFile(uploaded_file)
-        # Baca Sheet 1 (FTE) & Sheet 2 (TLX) sesuai offset header template
-        df_fte_raw = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=20)
-        df_tlx_raw = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=3)
         
-        # Bersihkan data kosong
+        # 1. Baca Sheet FTE & Cari baris header secara dinamis
+        df_fte_temp = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=None)
+        # Cari baris yang mengandung teks 'Deskripsi Tugas'
+        header_idx_fte = df_fte_temp[df_fte_temp.iloc[:, 1].astype(str).str.contains("Deskripsi Tugas", na=False)].index[0]
+        df_fte_raw = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=header_idx_fte)
+        
+        # 2. Baca Sheet TLX & Cari baris header secara dinamis
+        df_tlx_temp = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=None)
+        header_idx_tlx = df_tlx_temp[df_tlx_temp.iloc[:, 2].astype(str).str.contains("Mental Demand", na=False)].index[0]
+        df_tlx_raw = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=header_idx_tlx)
+        
+        # 3. Bersihkan data kosong
         df_fte_clean = df_fte_raw.dropna(subset=["Deskripsi Tugas / Aktivitas Pekerjaan"]).copy()
         df_tlx_clean = df_tlx_raw.dropna(subset=["Mental Demand (MD)"]).copy()
         
-        # Gabungkan / olah data dari Excel ke daftar tasks aktif
-        # (Data dari Excel kini yang dipakai untuk kalkulasi dashboard)
         st.sidebar.success("✅ File Excel Berhasil Dibaca!")
     except Exception as e:
         st.sidebar.error(f"Gagal membaca Excel: {e}")
