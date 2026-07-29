@@ -1,3 +1,4 @@
+import io  # Tambahkan ini di bagian atas bersama streamlit & pandas
 import streamlit as st
 import pandas as pd
 import numpy as np
