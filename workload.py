@@ -220,3 +220,6 @@ with tab4:
 
 st.sidebar.markdown("---")
 st.sidebar.success("Aplikasi HWAS Siap Digunakan!")
+st.sidebar.markdown("---")
+st.sidebar.caption("© 2026 HWAS Assessment Tool")
+st.sidebar.caption("Dikembangkan oleh Sarah Saputri dan Tim, 2026")
