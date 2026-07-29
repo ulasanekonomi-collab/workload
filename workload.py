@@ -380,10 +380,37 @@ with tab4:
         st.markdown("---")
         st.subheader("📥 Unduh Laporan Manajerial Lengkap")
 
-        # 2. Siapkan data FTE dan TLX untuk sheet pendukung
-        df_fte_export = pd.DataFrame(active_tasks)[["Task", "Durasi", "Frekuensi", "BasisWaktu", "TotalMenitTahun", "FTE"]].copy()
-        df_fte_export.columns = ["Deskripsi Tugas", "Durasi (Menit)", "Frekuensi", "Basis Waktu", "Total Menit/Tahun", "Indeks FTE"]
+        # 2. Siapkan data FTE untuk sheet pendukung (Kalkulasi realtime)
+        fte_list = []
+        for task in active_tasks:
+            d = task["Durasi"]
+            f = task["Freq"]
+            b = str(task["Basis"]).lower()
+            
+            if "kedatangan" in b:
+                mult = 104
+            elif "minggu" in b:
+                mult = 52
+            elif "bulan" in b:
+                mult = 12
+            else:
+                mult = hari_kerja_efektif
+                
+            tot_menit = d * f * mult
+            indeks_fte = tot_menit / jke_menit_tahun
+            
+            fte_list.append({
+                "Deskripsi Tugas": task["Task"],
+                "Durasi (Menit)": d,
+                "Frekuensi": f,
+                "Basis Waktu": task["Basis"],
+                "Total Menit/Tahun": tot_menit,
+                "Indeks FTE": round(indeks_fte, 4)
+            })
+            
+        df_fte_export = pd.DataFrame(fte_list)
 
+        # Siapkan data TLX untuk sheet pendukung
         df_tlx_export = pd.DataFrame(active_tasks)[["Task", "MD", "PD", "TD", "OP", "EF", "FR"]].copy()
         df_tlx_export["Skor Raw TLX"] = (
             df_tlx_export["MD"] + df_tlx_export["PD"] + df_tlx_export["TD"] + 
@@ -393,7 +420,6 @@ with tab4:
             lambda x: "Sangat Tinggi" if x > 80 else ("Tinggi" if x > 60 else "Sedang")
         )
         df_tlx_export.columns = ["Deskripsi Tugas", "Mental (MD)", "Fisik (PD)", "Waktu (TD)", "Performa (OP)", "Usaha (EF)", "Frustrasi (FR)", "Skor Raw TLX", "Kategori Beban Mental"]
-
         # 3. Fungsi Helper Multi-Sheet Khusus Tab Manajerial
         def export_multisheet_managerial(df_summary, df_fte, df_tlx):
             import io
