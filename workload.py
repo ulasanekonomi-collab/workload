@@ -307,10 +307,10 @@ with tab3:
     st.caption("Evaluasi tingkat beban mental, fisik, temporal, performa, usaha, dan frustrasi per aktivitas tugas.")
     
     if active_tasks:
-        # 1. Buat DataFrame rincian TLX
+        # 1. Buat dataframe rincian TLX
         df_tlx_detail = pd.DataFrame(active_tasks)[["Task", "MD", "PD", "TD", "OP", "EF", "FR"]].copy()
-        
-        # Hitung Raw TLX per baris tugas untuk melengkapi laporan
+
+        # Hitung Raw TLX per baris tugas
         df_tlx_detail["Skor Raw TLX"] = (
             df_tlx_detail["MD"] + 
             df_tlx_detail["PD"] + 
@@ -319,21 +319,32 @@ with tab3:
             df_tlx_detail["EF"] + 
             df_tlx_detail["FR"]
         ) / 6.0
-        
-        # Tampilkan Tabel
+
+        # Tambahkan Kategori Beban Mental
+        df_tlx_detail["Kategori Mental"] = df_tlx_detail["Skor Raw TLX"].apply(
+            lambda x: "Sangat Tinggi" if x > 80 else ("Tinggi" if x > 60 else "Sedang")
+        )
+
+        # Rename kolom agar rapi saat ditampilkan & diunduh
+        df_tlx_detail.columns = [
+            "Deskripsi Tugas", "Mental (MD)", "Fisik (PD)", "Waktu (TD)", 
+            "Performa (OP)", "Usaha (EF)", "Frustrasi (FR)", "Skor Raw TLX", "Kategori Beban Mental"
+        ]
+
+        # Tampilkan tabel di Streamlit
         st.dataframe(df_tlx_detail, use_container_width=True)
-        
+
         st.markdown("---")
         st.subheader("📥 Ekspor Data Analisis Psikologis TLX")
-        
-        # 2. Konversi ke biner Excel menggunakan fungsi helper convert_df_to_excel
+
+        # Conversi ke biner Excel
         excel_tlx_bytes = convert_df_to_excel(df_tlx_detail)
-        
-        # 3. Tombol Unduh Excel
+
+        # Tombol Unduh Excel Hasil Analisis TLX
         st.download_button(
-            label="📊 Unduh Rincian NASA-TLX (Excel .xlsx)",
+            label="📊 Unduh Rincian NASA-TLX (.xlsx)",
             data=excel_tlx_bytes,
-            file_name="Analisis_Psikologis_NASA_TLX.xlsx",
+            file_name="Hasil_Analisis_Psychological_NASA_TLX.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
