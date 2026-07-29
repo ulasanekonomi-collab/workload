@@ -348,42 +348,66 @@ with tab3:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-# ------------------------------------------
 # TAB 4: LAPORAN MANAJERIAL
-# ------------------------------------------
 with tab4:
-    st.subheader("📋 Rekomendasi & Intervensi Manajerial")
-    st.markdown(f"**Diagnosis Posisi:** {kuadran_text}")
-    
-    # Narasi Evaluasi Beban Fisik
-    if total_fte > 1.28:
-        st.error("⚠️ **Rekomendasi Beban Fisik:** Posisi ini mengalami *Overload* (FTE > 1.28). Diperlukan rekrutmen SDM tambahan atau redistribusi alur kerja.")
-    elif total_fte < 1.00:
-        st.warning("ℹ️ **Rekomendasi Beban Fisik:** Posisi ini *Under-utilized* (FTE < 1.00). Lakukan *job enrichment* atau penambahan cakupan tugas.")
-    else:
-        st.success("✅ **Rekomendasi Beban Fisik:** Kapasitas fisik berada pada rentang ideal (1.00 - 1.28).")
-        
-    # Narasi Evaluasi Beban Mental
-    if skor_tlx_avg > 66.66:
-        st.error("⚠️ **Rekomendasi Beban Mental:** Stres psikologis tinggi (> 66.66). Lakukan evaluasi birokrasi, otomatisasi sistem, atau perbaikan sarana kerja.")
-    else:
-        st.success("✅ **Rekomendasi Beban Mental:** Tingkat stres psikologis dalam kondisi wajar/terkendali (<= 66.66).")
+    st.subheader("📋 Laporan Eksekutif Integratif HWAS")
+    st.caption("Ringkasan komprehensif hasil evaluasi beban fisik (FTE) dan psikologis (NASA-TLX).")
 
-    # --------------------------------------
-    # BAGIAN TOMBOL DOWNLOAD EXCEL (DI SINI TEMPATNYA)
-    # --------------------------------------
-    st.markdown("---")
-    st.subheader("📥 Ekspor Rekap Data WLA")
-    st.caption("Unduh berkas Excel berisi seluruh rincian kalkulasi aktivitas, FTE, dan parameter NASA-TLX.")
-    
-    # 1. Konversi active_tasks ke DataFrame lalu ke biner Excel
-    df_download = pd.DataFrame(active_tasks)
-    excel_bytes = convert_df_to_excel(df_download)
-    
-    # 2. Tombol Unduh
-    st.download_button(
-        label="📊 Download Hasil Analisis (Excel .xlsx)",
-        data=excel_bytes,
-        file_name="Hasil_Analisis_HWAS.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    if active_tasks:
+        # 1. Menyiapkan DataFrame Ringkasan Eksekutif
+        df_summary_mgr = pd.DataFrame({
+            "Parameter Evaluasi": [
+                "Total Aktivitas (Task)", 
+                "Indeks Total FTE", 
+                "Status Beban Fisik",
+                "Rata-rata Skor NASA-TLX", 
+                "Status Beban Mental",
+                "Diagnosis Kuadran HWAS"
+            ],
+            "Nilai / Status": [
+                len(active_tasks),
+                f"{total_fte:.2f}",
+                "Overload" if total_fte > 1.28 else ("Underload" if total_fte < 1.00 else "Ideal"),
+                f"{skor_tlx_avg:.2f}",
+                "Tinggi (Stres)" if skor_tlx_avg > 66.66 else "Normal/Terkendali",
+                kuadran_text
+            ]
+        })
+
+        # Display Ringkasan di Tab
+        st.dataframe(df_summary_mgr, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("📥 Unduh Laporan Manajerial Lengkap")
+
+        # 2. Siapkan data FTE dan TLX untuk sheet pendukung
+        df_fte_export = pd.DataFrame(active_tasks)[["Task", "Durasi", "Frekuensi", "BasisWaktu", "TotalMenitTahun", "FTE"]].copy()
+        df_fte_export.columns = ["Deskripsi Tugas", "Durasi (Menit)", "Frekuensi", "Basis Waktu", "Total Menit/Tahun", "Indeks FTE"]
+
+        df_tlx_export = pd.DataFrame(active_tasks)[["Task", "MD", "PD", "TD", "OP", "EF", "FR"]].copy()
+        df_tlx_export["Skor Raw TLX"] = (
+            df_tlx_export["MD"] + df_tlx_export["PD"] + df_tlx_export["TD"] + 
+            (100 - df_tlx_export["OP"]) + df_tlx_export["EF"] + df_tlx_export["FR"]
+        ) / 6.0
+        df_tlx_export["Kategori Mental"] = df_tlx_export["Skor Raw TLX"].apply(
+            lambda x: "Sangat Tinggi" if x > 80 else ("Tinggi" if x > 60 else "Sedang")
+        )
+        df_tlx_export.columns = ["Deskripsi Tugas", "Mental (MD)", "Fisik (PD)", "Waktu (TD)", "Performa (OP)", "Usaha (EF)", "Frustrasi (FR)", "Skor Raw TLX", "Kategori Beban Mental"]
+
+        # 3. Fungsi Helper Multi-Sheet Khusus Tab Manajerial
+        def export_multisheet_managerial(df_summary, df_fte, df_tlx):
+            import io
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_summary.to_excel(writer, index=False, sheet_name='Executive Summary')
+                df_fte.to_excel(writer, index=False, sheet_name='Rincian FTE')
+                df_tlx.to_excel(writer, index=False, sheet_name='Rincian NASA-TLX')
+            return output.getvalue()
+
+        # 4. Tombol Download Laporan Manajerial Multi-Sheet
+        st.download_button(
+            label="💼 Unduh Laporan Manajerial Komprehensif (.xlsx)",
+            data=export_multisheet_managerial(df_summary_mgr, df_fte_export, df_tlx_export),
+            file_name="Laporan_Manajerial_Komprehensif_HWAS.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
