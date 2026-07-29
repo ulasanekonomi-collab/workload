@@ -46,7 +46,7 @@ st.markdown("<p class='main-title'>🧠 Hybrid Workload Assessment System (HWAS)
 st.markdown("<p class='sub-title'>Integrasi Beban Kerja Kuantitatif (FTE) dan Stres Psikologis (NASA-TLX)</p>", unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ Pengaturan & Import Data")
-uploaded_file = st.sidebar.file_path = st.sidebar.file_uploader("Upload File Excel WLA", type=["xlsx", "xls"])
+uploaded_file = st.sidebar.file_uploader("Upload File Excel WLA", type=["xlsx", "xls"])
 
 # Sidebar Parameters JKE
 st.sidebar.subheader("📅 Parameter Jam Kerja Efektif")
