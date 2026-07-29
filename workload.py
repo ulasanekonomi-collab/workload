@@ -68,28 +68,58 @@ st.sidebar.info(f"**Hari Kerja Efektif:** {hke} Hari/Thn\n\n**JKE Tahun:** {jke_
 # ==========================================
 # 3. PENANGANAN DATA (UPLOAD VS DEFAULT)
 # ==========================================
+
+# 1. Siapkan Data Default/Dummy
+default_tasks = [
+    # ... (daftar 10 tugas dummy yang sudah ada) ...
+]
+
+# 2. Inisialisasi active_tasks dengan default_tasks
+active_tasks = default_tasks
+
+# 3. Jika pengguna meng-upload file Excel, timpa active_tasks dengan data dari Excel
 if uploaded_file is not None:
     try:
         xls = pd.ExcelFile(uploaded_file)
         
-        # 1. Baca Sheet FTE & Cari baris header secara dinamis
-        df_fte_temp = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=None)
-        # Cari baris yang mengandung teks 'Deskripsi Tugas'
-        header_idx_fte = df_fte_temp[df_fte_temp.iloc[:, 1].astype(str).str.contains("Deskripsi Tugas", na=False)].index[0]
-        df_fte_raw = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=header_idx_fte)
+        # Baca FTE & TLX dengan header yang sesuai
+        df_fte = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=19)
+        df_tlx = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=4)
         
-        # 2. Baca Sheet TLX & Cari baris header secara dinamis
-        df_tlx_temp = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=None)
-        header_idx_tlx = df_tlx_temp[df_tlx_temp.iloc[:, 2].astype(str).str.contains("Mental Demand", na=False)].index[0]
-        df_tlx_raw = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=header_idx_tlx)
+        # Bersihkan data kosong
+        df_fte = df_fte.dropna(subset=["Deskripsi Tugas / Aktivitas Pekerjaan"])
+        df_tlx = df_tlx.dropna(subset=["Mental Demand (MD)"])
         
-        # 3. Bersihkan data kosong
-        df_fte_clean = df_fte_raw.dropna(subset=["Deskripsi Tugas / Aktivitas Pekerjaan"]).copy()
-        df_tlx_clean = df_tlx_raw.dropna(subset=["Mental Demand (MD)"]).copy()
-        
-        st.sidebar.success("✅ File Excel Berhasil Dibaca!")
+        # Konversi DataFrame Excel menjadi format list dictionary untuk active_tasks
+        uploaded_tasks = []
+        for i in range(min(len(df_fte), len(df_tlx))):
+            row_f = df_fte.iloc[i]
+            row_t = df_tlx.iloc[i]
+            
+            uploaded_tasks.append({
+                "Task": str(row_f["Deskripsi Tugas / Aktivitas Pekerjaan"]),
+                "Durasi": float(row_f["Waktu / Durasi (Menit)"]),
+                "Freq": float(row_f["Frekuensi / Volume"]),
+                "Basis": str(row_f["Basis Frekuensi"]),
+                "MD": float(row_t["Mental Demand (MD)"]),
+                "PD": float(row_t["Physical Demand (PD)"]),
+                "TD": float(row_t["Temporal Demand (TD)"]),
+                "OP": float(row_t["Performance (OP)"]),
+                "EF": float(row_t["Effort (EF)"]),
+                "FR": float(row_t["Frustration (FR)"])
+            })
+            
+        if len(uploaded_tasks) > 0:
+            active_tasks = uploaded_tasks # TIMPA VARIABEL UTAMA
+            st.sidebar.success("✅ Data Excel Berhasil Ditampilkan!")
+            
     except Exception as e:
-        st.sidebar.error(f"Gagal membaca Excel: {e}")
+        st.sidebar.error(f"Gagal memproses data Excel: {e}")
+
+# ==========================================
+# 4. KALKULASI DASHBOARD (Gunakan active_tasks)
+# ==========================================
+# Pastikan SEMUA kalkulasi di bawah ini menggunakan 'active_tasks', BUKAN 'default_tasks'
 # ==========================================
 # 3. DUMMY DATA DEFAULT (GUDANG FURNITURE)
 # ==========================================
