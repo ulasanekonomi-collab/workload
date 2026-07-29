@@ -271,7 +271,34 @@ with tab2:
         file_name="Data_Aktivitas_HWAS.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
+# Tombol Download Ringkasan Integratif untuk Tab 1
+    st.markdown("---")
+    summary_data = {
+        "Indikator Utama": [
+            "Jumlah Total Aktivitas (Task)",
+            "Nilai Full-Time Equivalent (FTE)",
+            "Status Beban Kerja Fisik",
+            "Rata-rata Skor NASA-TLX",
+            "Status Beban Mental",
+            "Kuadran Diagnosis HWAS"
+        ],
+        "Hasil Evaluasi": [
+            len(active_tasks),
+            f"{total_fte:.2f}",
+            "Overload" if total_fte > 1.28 else ("Underload" if total_fte < 1.00 else "Ideal"),
+            f"{skor_tlx_avg:.2f}",
+            "Tinggi (Stres)" if skor_tlx_avg > 66.66 else "Normal/Terkendali",
+            kuadran_text
+        ]
+    }
+    df_summary_integratif = pd.DataFrame(summary_data)
+    
+    st.download_button(
+        label="📊 Unduh Ringkasan Integratif (.xlsx)",
+        data=convert_df_to_excel(df_summary_integratif),
+        file_name="Ringkasan_Evaluasi_Integratif_HWAS.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 # ------------------------------------------
 # TAB 3: ANALISIS PSIKOLOGIS TLX
 # ------------------------------------------
