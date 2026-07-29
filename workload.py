@@ -82,28 +82,32 @@ if uploaded_file is not None:
     try:
         xls = pd.ExcelFile(uploaded_file)
         
-        # 1. Baca mentah sheet FTE & cari baris tempat header berada secara otomatis
+        # 1. Cari baris header secara dinamis
         df_fte_raw_temp = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=None)
-        # Cari indeks baris yang mengandung tulisan 'Deskripsi Tugas'
         fte_header_row = df_fte_raw_temp[df_fte_raw_temp.apply(lambda row: row.astype(str).str.contains("Deskripsi Tugas").any(), axis=1)].index[0]
         
-        # 2. Baca mentah sheet TLX & cari baris header secara otomatis
         df_tlx_raw_temp = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=None)
-        # Cari indeks baris yang mengandung tulisan 'Mental Demand'
         tlx_header_row = df_tlx_raw_temp[df_tlx_raw_temp.apply(lambda row: row.astype(str).str.contains("Mental Demand").any(), axis=1)].index[0]
         
-        # 3. Baca ulang DataFrame menggunakan baris header yang sudah ketemu tepat
+        # 2. Baca DataFrame
         df_fte = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=fte_header_row)
         df_tlx = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=tlx_header_row)
         
-        # Bersihkan kolom & baris kosong
         df_fte.columns = df_fte.columns.str.strip()
         df_tlx.columns = df_tlx.columns.str.strip()
         
-        df_fte = df_fte.dropna(subset=["Deskripsi Tugas / Aktivitas Pekerjaan"]).copy()
-        df_tlx = df_tlx.dropna(subset=["Mental Demand (MD)"]).copy()
+        # 3. FILTER KETAT: Buang baris #REF!, NaN, dan baris Rata-rata/Total
+        df_fte = df_fte[
+            df_fte["Deskripsi Tugas / Aktivitas Pekerjaan"].notna() & 
+            ~df_fte["Deskripsi Tugas / Aktivitas Pekerjaan"].astype(str).str.contains("#REF!|TOTAL", case=False, na=False)
+        ].copy()
         
-        # 4. Susun uploaded_tasks
+        df_tlx = df_tlx[
+            df_tlx["Aktivitas / Tugas Pekerjaan"].notna() & 
+            ~df_tlx["Aktivitas / Tugas Pekerjaan"].astype(str).str.contains("#REF!|RATA-RATA", case=False, na=False)
+        ].copy()
+        
+        # 4. Buat list task aktif
         uploaded_tasks = []
         min_len = min(len(df_fte), len(df_tlx))
         
@@ -126,7 +130,7 @@ if uploaded_file is not None:
             
         if uploaded_tasks:
             active_tasks = uploaded_tasks  # Timpa data aktif
-            st.sidebar.success("✅ Data Excel Berhasil Di-load!")
+            st.sidebar.success("✅ Data Excel Gudang Interior Berhasil Di-load!")
             
     except Exception as e:
         st.sidebar.error(f"Gagal memproses data Excel: {e}")
