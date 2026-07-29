@@ -3,144 +3,60 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import io
 
 # ==========================================
-# 1. KONFIGURASI HALAMAN & TEMA
+# 1. KONFIGURASI HALAMAN STREAMLIT
 # ==========================================
 st.set_page_config(
-    page_title="HWAS - Hybrid Workload Assessment",
+    page_title="HWAS - Hybrid Workload Assessment System",
     page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Custom CSS Styling
-st.markdown("""
-    <style>
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 700;
-        color: #1B365D;
-        margin-bottom: 0px;
-    }
-    .sub-title {
-        font-size: 1.1rem;
-        color: #555555;
-        margin-bottom: 20px;
-    }
-    .metric-card {
-        background-color: #F8F9FA;
-        border-radius: 10px;
-        padding: 15px;
-        border-left: 5px solid #1B365D;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    </style>
-""", unsafe_allow_html=True)
+st.title("🧠 Hybrid Workload Assessment System (HWAS)")
+st.caption("Integrasi Beban Kerja Kuantitatif (FTE) dan Stres Psikologis (NASA-TLX)")
 
-# 2. HEADER & SIDEBAR
 # ==========================================
-st.markdown("<p class='main-title'>🧠 Hybrid Workload Assessment System (HWAS)</p>", unsafe_allow_html=True)
-st.markdown("<p class='sub-title'>Integrasi Beban Kerja Kuantitatif (FTE) dan Stres Psikologis (NASA-TLX)</p>", unsafe_allow_html=True)
+# 2. SIDEBAR: PARAMETER & IMPORT DATA
+# ==========================================
+st.sidebar.header("📁 Pengaturan & Import Data")
 
-st.sidebar.header("⚙️ Pengaturan & Import Data")
+uploaded_file = st.sidebar.file_uploader(
+    "Upload File Excel WLA", 
+    type=["xlsx", "xls"],
+    help="Gunakan template resmi HWAS (Kalkulasi FTE & NASA-TLX)"
+)
 
-# FIX LINE 49: Perbaikan uploader
-uploaded_file = st.sidebar.file_uploader("Upload File Excel WLA", type=["xlsx", "xls"])
-
-# Sidebar parameters JKE
+st.sidebar.markdown("---")
 st.sidebar.subheader("📅 Parameter Jam Kerja Efektif")
-hari_kalender = st.sidebar.number_input("Hari Kalender / Tahun", value=365)
-weekend = st.sidebar.number_input("Weekend (Sabtu & Minggu)", value=104)
-cuti = st.sidebar.number_input("Cuti Tahunan", value=12)
-libur_nasional = st.sidebar.number_input("Libur Nasional / Cuti Bersama", value=17)
-allowance = st.sidebar.slider("Faktor Efisiensi (Allowance)", 0.50, 1.00, 0.85, step=0.01)
 
-# Kalkulasi JKE
-hke = hari_kalender - (weekend + cuti + libur_nasional)
-jam_formal = 8
-jke_jam_tahun = hke * jam_formal * allowance
+hari_kalender = st.sidebar.number_input("Hari Kalender / Tahun", value=365, step=1)
+weekend = st.sidebar.number_input("Weekend (Sabtu & Minggu)", value=104, step=1)
+cuti_tahunan = st.sidebar.number_input("Cuti Tahunan", value=12, step=1)
+libur_nasional = st.sidebar.number_input("Libur Nasional / Cuti Bersama", value=17, step=1)
+
+allowance = st.sidebar.slider(
+    "Faktor Efisiensi (Allowance)", 
+    min_value=0.50, 
+    max_value=1.00, 
+    value=0.85, 
+    step=0.01,
+    help="Standar Indoor=0.875, Outdoor/Gudang=0.85"
+)
+
+# Kalkulasi Jam Kerja Efektif (JKE)
+hari_kerja_efektif = hari_kalender - (weekend + cuti_tahunan + libur_nasional)
+jam_formal_tahun = hari_kerja_efektif * 8
+jke_jam_tahun = jam_formal_tahun * allowance
 jke_menit_tahun = jke_jam_tahun * 60
 
-st.sidebar.info(f"**Hari Kerja Efektif:** {hke} Hari/Thn\n\n**JKE Tahun:** {jke_jam_tahun:.1f} Jam ({jke_menit_tahun:,.0f} Menit)")
+st.sidebar.info(
+    f"**Hari Kerja Efektif:** {hari_kerja_efektif} Hari/Thn\n\n"
+    f"**JKE Tahun:** {jke_jam_tahun:.1f} Jam ({jke_menit_tahun:,.0f} Menit)"
+)
 
 # ==========================================
-# 3. PENANGANAN DATA (UPLOAD VS DEFAULT)
-# ==========================================
-
-# 1. Siapkan Data Default/Dummy
-default_tasks = [
-    # ... (daftar 10 tugas dummy yang sudah ada) ...
-]
-
-# 2. Inisialisasi active_tasks dengan default_tasks
-active_tasks = default_tasks
-
-# 3. Jika pengguna meng-upload file Excel, timpa active_tasks dengan data dari Excel
-if uploaded_file is not None:
-    try:
-        xls = pd.ExcelFile(uploaded_file)
-        
-        # 1. Cari baris header secara dinamis
-        df_fte_raw_temp = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=None)
-        fte_header_row = df_fte_raw_temp[df_fte_raw_temp.apply(lambda row: row.astype(str).str.contains("Deskripsi Tugas").any(), axis=1)].index[0]
-        
-        df_tlx_raw_temp = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=None)
-        tlx_header_row = df_tlx_raw_temp[df_tlx_raw_temp.apply(lambda row: row.astype(str).str.contains("Mental Demand").any(), axis=1)].index[0]
-        
-        # 2. Baca DataFrame
-        df_fte = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=fte_header_row)
-        df_tlx = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=tlx_header_row)
-        
-        df_fte.columns = df_fte.columns.str.strip()
-        df_tlx.columns = df_tlx.columns.str.strip()
-        
-        # 3. FILTER KETAT: Buang baris #REF!, NaN, dan baris Rata-rata/Total
-        df_fte = df_fte[
-            df_fte["Deskripsi Tugas / Aktivitas Pekerjaan"].notna() & 
-            ~df_fte["Deskripsi Tugas / Aktivitas Pekerjaan"].astype(str).str.contains("#REF!|TOTAL", case=False, na=False)
-        ].copy()
-        
-        df_tlx = df_tlx[
-            df_tlx["Aktivitas / Tugas Pekerjaan"].notna() & 
-            ~df_tlx["Aktivitas / Tugas Pekerjaan"].astype(str).str.contains("#REF!|RATA-RATA", case=False, na=False)
-        ].copy()
-        
-        # 4. Buat list task aktif
-        uploaded_tasks = []
-        min_len = min(len(df_fte), len(df_tlx))
-        
-        for i in range(min_len):
-            row_f = df_fte.iloc[i]
-            row_t = df_tlx.iloc[i]
-            
-            uploaded_tasks.append({
-                "Task": str(row_f["Deskripsi Tugas / Aktivitas Pekerjaan"]),
-                "Durasi": float(row_f["Waktu / Durasi (Menit)"]),
-                "Freq": float(row_f["Frekuensi / Volume"]),
-                "Basis": str(row_f["Basis Frekuensi"]),
-                "MD": float(row_t["Mental Demand (MD)"]),
-                "PD": float(row_t["Physical Demand (PD)"]),
-                "TD": float(row_t["Temporal Demand (TD)"]),
-                "OP": float(row_t["Performance (OP)"]),
-                "EF": float(row_t["Effort (EF)"]),
-                "FR": float(row_t["Frustration (FR)"])
-            })
-            
-        if uploaded_tasks:
-            active_tasks = uploaded_tasks  # Timpa data aktif
-            st.sidebar.success("✅ Data Excel Gudang Interior Berhasil Di-load!")
-            
-    except Exception as e:
-        st.sidebar.error(f"Gagal memproses data Excel: {e}")
-
-# ==========================================
-# 4. KALKULASI DASHBOARD (Gunakan active_tasks)
-# ==========================================
-# Pastikan SEMUA kalkulasi di bawah ini menggunakan 'active_tasks', BUKAN 'default_tasks'
-# ==========================================
-# 3. DUMMY DATA DEFAULT (GUDANG FURNITURE)
+# 3. DEFINISI DUMMY DATA DEFAULT (FALLBACK)
 # ==========================================
 default_tasks = [
     {"Task": "Memeriksa jadwal penerimaan barang", "Durasi": 4, "Freq": 1, "Basis": "per kedatangan (104x/thn)", "MD": 50, "PD": 20, "TD": 40, "OP": 80, "EF": 45, "FR": 25},
@@ -151,150 +67,217 @@ default_tasks = [
     {"Task": "Berkoordinasi dengan Admin Furniture", "Durasi": 5, "Freq": 25, "Basis": "per hari", "MD": 65, "PD": 30, "TD": 75, "OP": 70, "EF": 60, "FR": 50},
     {"Task": "Berkoordinasi dengan Kurir Furniture", "Durasi": 10, "Freq": 2, "Basis": "per hari", "MD": 45, "PD": 30, "TD": 50, "OP": 80, "EF": 45, "FR": 30},
     {"Task": "Menyiapkan barang display lantai 2", "Durasi": 15, "Freq": 1, "Basis": "per hari", "MD": 35, "PD": 60, "TD": 40, "OP": 85, "EF": 50, "FR": 20},
-    {"Task": "Menyiapkan barang pesanan Gosend/Instant", "Durasi": 1, "Freq": 10, "Basis": "per hari", "MD": 40, "PD": 50, "TD": 85, "OP": 75, "EF": 60, "FR": 40},
-    {"Task": "Membantu merakit lemari ekspedisi (Lalamove)", "Durasi": 5, "Freq": 10, "Basis": "per hari", "MD": 50, "PD": 80, "TD": 60, "OP": 75, "EF": 75, "FR": 45},
-    {"Task": "Merencanakan operasional saat keterlambatan", "Durasi": 10, "Freq": 1, "Basis": "per minggu", "MD": 80, "PD": 20, "TD": 75, "OP": 65, "EF": 70, "FR": 65},
-    {"Task": "Stock Opname (Sabtu 08.00 - 14.00)", "Durasi": 360, "Freq": 1, "Basis": "per minggu", "MD": 85, "PD": 75, "TD": 80, "OP": 70, "EF": 85, "FR": 70},
-    {"Task": "Loading/unloading insidental malam hari", "Durasi": 120, "Freq": 2, "Basis": "per bulan", "MD": 60, "PD": 85, "TD": 70, "OP": 70, "EF": 80, "FR": 75},
+    {"Task": "Menyiapkan barang pesanan Gosend/Instant", "Durasi": 3, "Freq": 10, "Basis": "per hari", "MD": 40, "PD": 50, "TD": 85, "OP": 75, "EF": 60, "FR": 40},
+    {"Task": "Membantu merakit lemari ekspedisi (Lalamove)", "Durasi": 5, "Freq": 10, "Basis": "per hari", "MD": 50, "PD": 80, "TD": 60, "OP": 75, "EF": 75, "FR": 45}
 ]
 
-df_tasks = pd.DataFrame(default_tasks)
+# Setel aktif awal menggunakan default data
+active_tasks = default_tasks
 
 # ==========================================
-# 4. PEMROSESAN DATA & KALKULASI
+# 4. PARSING DOKUMEN EXCEL DINAMIS (JIKA UPLOAD)
 # ==========================================
-def hitung_menit_tahun(row, hke):
-    d = row['Durasi']
-    f = row['Freq']
-    b = row['Basis']
-    if 'kedatangan' in b:
-        return d * f * 104
-    elif 'hari' in b:
-        return d * f * hke
-    elif 'minggu' in b:
-        return d * f * 52
-    elif 'bulan' in b:
-        return d * f * 12
-    return 0
+if uploaded_file is not None:
+    try:
+        xls = pd.ExcelFile(uploaded_file)
+        
+        # 1. Cari baris header secara otomatis
+        df_fte_raw_temp = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=None)
+        fte_header_row = df_fte_raw_temp[df_fte_raw_temp.apply(lambda row: row.astype(str).str.contains("Deskripsi Tugas").any(), axis=1)].index[0]
+        
+        df_tlx_raw_temp = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=None)
+        tlx_header_row = df_tlx_raw_temp[df_tlx_raw_temp.apply(lambda row: row.astype(str).str.contains("Mental Demand").any(), axis=1)].index[0]
+        
+        # 2. Baca sheet sesuai header
+        df_fte = pd.read_excel(xls, sheet_name="Kalkulasi FTE", header=fte_header_row)
+        df_tlx = pd.read_excel(xls, sheet_name="Analisis Psikologis TLX", header=tlx_header_row)
+        
+        df_fte.columns = df_fte.columns.str.strip()
+        df_tlx.columns = df_tlx.columns.str.strip()
+        
+        # 3. Filter ketat: buang NaN, teks #REF!, dan baris Ringkasan Total
+        df_fte = df_fte[
+            df_fte["Deskripsi Tugas / Aktivitas Pekerjaan"].notna() & 
+            ~df_fte["Deskripsi Tugas / Aktivitas Pekerjaan"].astype(str).str.contains("#REF!|TOTAL", case=False, na=False)
+        ].copy()
+        
+        df_tlx = df_tlx[
+            df_tlx["Aktivitas / Tugas Pekerjaan"].notna() & 
+            ~df_tlx["Aktivitas / Tugas Pekerjaan"].astype(str).str.contains("#REF!|RATA-RATA", case=False, na=False)
+        ].copy()
+        
+        # 4. Susun task ter-upload
+        uploaded_tasks = []
+        min_len = min(len(df_fte), len(df_tlx))
+        
+        for i in range(min_len):
+            rf = df_fte.iloc[i]
+            rt = df_tlx.iloc[i]
+            
+            uploaded_tasks.append({
+                "Task": str(rf["Deskripsi Tugas / Aktivitas Pekerjaan"]),
+                "Durasi": float(rf["Waktu / Durasi (Menit)"]),
+                "Freq": float(rf["Frekuensi / Volume"]),
+                "Basis": str(rf["Basis Frekuensi"]),
+                "MD": float(rt["Mental Demand (MD)"]),
+                "PD": float(rt["Physical Demand (PD)"]),
+                "TD": float(rt["Temporal Demand (TD)"]),
+                "OP": float(rt["Performance (OP)"]),
+                "EF": float(rt["Effort (EF)"]),
+                "FR": float(rt["Frustration (FR)"])
+            })
+            
+        if uploaded_tasks:
+            active_tasks = uploaded_tasks  # Timpa data aktif
+            st.sidebar.success("✅ Data Excel Berhasil Di-load!")
+            
+    except Exception as e:
+        st.sidebar.error(f"Gagal memproses data Excel: {e}")
 
-df_tasks['Total_Menit_Tahun'] = df_tasks.apply(lambda r: hitung_menit_tahun(r, hke), axis=1)
-df_tasks['FTE'] = df_tasks['Total_Menit_Tahun'] / jke_menit_tahun
-df_tasks['RTLX'] = (df_tasks['MD'] + df_tasks['PD'] + df_tasks['TD'] + (100 - df_tasks['OP']) + df_tasks['EF'] + df_tasks['FR']) / 6
+# ==========================================
+# 5. KALKULASI DINAMIS REALTIME (AKURAT)
+# ==========================================
+total_menit_kerja = 0
+for task in active_tasks:
+    d = task["Durasi"]
+    f = task["Freq"]
+    b = str(task["Basis"]).lower()
+    
+    if "kedatangan" in b:
+        mult = 104
+    elif "minggu" in b:
+        mult = 52
+    elif "bulan" in b:
+        mult = 12
+    else:  # 'per hari' atau default lainnya
+        mult = hari_kerja_efektif
+        
+    total_menit_kerja += (d * f * mult)
 
-total_fte = df_tasks['FTE'].sum()
-avg_rtl = df_tasks['RTLX'].mean()
+# Indeks FTE Total
+total_fte = total_menit_kerja / jke_menit_tahun
+
+# Rata-rata Skor Raw TLX
+scores_tlx = []
+for task in active_tasks:
+    s = (task["MD"] + task["PD"] + task["TD"] + (100 - task["OP"]) + task["EF"] + task["FR"]) / 6.0
+    scores_tlx.append(s)
+
+skor_tlx_avg = sum(scores_tlx) / len(scores_tlx) if scores_tlx else 0
 
 # Penentuan Kuadran
-if total_fte > 1.28 and avg_rtl > 66.66:
-    kuadran = "KUADRAN I: EXTREME OVERLOAD & BURNOUT RISK"
-    color_q = "red"
-elif total_fte <= 1.28 and avg_rtl > 66.66:
-    kuadran = "KUADRAN II: ANOMALI PSIKOLOGIS (Stres Kognitif/Sistem)"
-    color_q = "orange"
-elif total_fte < 1.00 and avg_rtl <= 66.66:
-    kuadran = "KUADRAN III: UNDER-UTILIZED / KAPASITAS LONGGAR"
-    color_q = "blue"
+if total_fte > 1.28 and skor_tlx_avg > 66.66:
+    kuadran_text = "KUADRAN I: BURNOUT / EKSTREM"
+elif total_fte <= 1.28 and skor_tlx_avg > 66.66:
+    kuadran_text = "KUADRAN II: ANOMALI PSIKOLOGIS"
+elif total_fte < 1.00 and skor_tlx_avg <= 66.66:
+    kuadran_text = "KUADRAN III: UNDER-UTILIZED / KAPASITAS LONGGAR"
 else:
-    kuadran = "KUADRAN IV: OPERASIONAL RUTIN / BALANCE"
-    color_q = "green"
+    kuadran_text = "KUADRAN IV: OPERASIONAL RUTIN / BALANCE"
 
 # ==========================================
-# 5. TAB TAMPILAN APLIKASI
+# 6. STRUCTURING TABS UNTUK INTERFACE
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Executive Dashboard", "📋 Input & Data Editor", "🧠 Analisis Psikologis TLX", "📝 Laporan Managerial"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Executive Dashboard", 
+    "📝 Input & Data Editor", 
+    "🧠 Analisis Psikologis TLX", 
+    "📋 Laporan Manajerial"
+])
 
-# --- TAB 1: EXECUTIVE DASHBOARD ---
+# ------------------------------------------
+# TAB 1: EXECUTIVE DASHBOARD
+# ------------------------------------------
 with tab1:
     st.subheader("Ringkasan Hasil Evaluasi Beban Kerja Integratif")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns([1, 1, 1.2])
     
     with col1:
-        st.metric("Total Indeks FTE (Kapasitas Fisik)", f"{total_fte:.4f}", 
-                  delta="FIT / OPTIMAL" if 1.0 <= total_fte <= 1.28 else ("OVERLOAD" if total_fte > 1.28 else "UNDERLOAD"),
-                  delta_color="normal" if 1.0 <= total_fte <= 1.28 else "inverse")
+        st.metric(
+            label="Total Indeks FTE (Kapasitas Fisik)",
+            value=f"{total_fte:.4f}",
+            delta="OVERLOAD" if total_fte > 1.28 else ("UNDERLOAD" if total_fte < 1.00 else "IDEAL")
+        )
         st.caption("Target FTE Ideal: 1.00 - 1.28")
-
+        
     with col2:
-        st.metric("Skor Raw TLX (Stres Psikologis)", f"{avg_rtl:.2f} / 100", 
-                  delta="BEBAN MENTAL TINGGI" if avg_rtl > 66.66 else "BEBAN SEDANG/RENDAH",
-                  delta_color="inverse" if avg_rtl > 66.66 else "normal")
+        st.metric(
+            label="Skor Raw TLX (Stres Psikologis)",
+            value=f"{skor_tlx_avg:.2f} / 100",
+            delta="BEBAN TINGGI" if skor_tlx_avg > 66.66 else "BEBAN SEDANG/RENDAH"
+        )
         st.caption("Batas Kritis Beban Mental: > 66.66")
-
+        
     with col3:
-        st.subheader("Diagnosis Utama:")
-        st.markdown(f"**:style[color:{color_q};]{{ {kuadran} }}**")
+        st.markdown("### Diagnosis Utama:")
+        st.info(f"**{kuadran_text}**")
 
     st.markdown("---")
-    
-    # Visualisasi Matriks Scatter Plot
     st.subheader("📍 Matriks Kuadran HWAS (FTE vs NASA-TLX)")
     
-    fig = px.scatter(
-        x=[total_fte], y=[avg_rtl],
-        labels={'x': 'Indeks FTE (Beban Fisik)', 'y': 'Skor Raw TLX (Beban Mental)'},
-        text=["Gudang Furniture (Indra Lesmana)"],
-        size=[20], color_discrete_sequence=['navy']
+    # Visualisasi Scatter Plot Kuadran dengan Plotly
+    fig = go.Figure()
+    
+    # Area Kuadran (Background Shapes)
+    fig.add_shape(type="rect", x0=0.5, y0=0, x1=1.28, y1=66.66, fillcolor="rgba(144, 238, 144, 0.3)", line_width=0) # III
+    fig.add_shape(type="rect", x0=1.28, y0=0, x1=2.0, y1=66.66, fillcolor="rgba(173, 216, 230, 0.3)", line_width=0) # IV
+    fig.add_shape(type="rect", x0=0.5, y0=66.66, x1=1.28, y1=100, fillcolor="rgba(255, 255, 224, 0.4)", line_width=0) # II
+    fig.add_shape(type="rect", x0=1.28, y0=66.66, x1=2.0, y1=100, fillcolor="rgba(255, 182, 193, 0.4)", line_width=0) # I
+    
+    # Titik Posisi Evaluasi
+    fig.add_trace(go.Scatter(
+        x=[total_fte],
+        y=[skor_tlx_avg],
+        mode="markers+text",
+        marker=dict(size=22, color="#1f77b4"),
+        text=["Posisi Jabatan Saat Ini"],
+        textposition="top center"
+    ))
+    
+    fig.update_layout(
+        xaxis_title="Indeks FTE (Beban Fisik)",
+        yaxis_title="Skor Raw TLX (Beban Mental)",
+        xaxis=dict(range=[0.5, max(2.0, total_fte + 0.2)]),
+        yaxis=dict(range=[0, 100]),
+        height=450,
+        margin=dict(l=20, r=20, t=20, b=20)
     )
     
-    # Tambah Garis Batas Kuadran
-    fig.add_shape(type="rect", x0=0.5, y0=0, x1=1.28, y1=66.66, fillcolor="lightgreen", opacity=0.3, line_width=0)
-    fig.add_shape(type="rect", x0=0.5, y0=66.66, x1=1.28, y1=100, fillcolor="orange", opacity=0.3, line_width=0)
-    fig.add_shape(type="rect", x0=1.28, y0=66.66, x1=2.0, y1=100, fillcolor="red", opacity=0.3, line_width=0)
-    fig.add_shape(type="rect", x0=1.28, y0=0, x1=2.0, y1=66.66, fillcolor="lightblue", opacity=0.3, line_width=0)
-    
-    fig.update_layout(xaxis_range=[0.5, 2.0], yaxis_range=[0, 100], height=450)
     st.plotly_chart(fig, use_container_width=True)
 
-# --- TAB 2: DATA EDITOR ---
+# ------------------------------------------
+# TAB 2: INPUT & DATA EDITOR
+# ------------------------------------------
 with tab2:
-    st.subheader("Edit Data Tugas & Rating Beban Kerja")
-    st.caption("Anda dapat mengubah angka durasi, frekuensi, maupun rating 6 dimensi psikologis secara langsung pada tabel di bawah ini:")
-    
-    edited_df = st.data_editor(df_tasks, num_rows="dynamic", use_container_width=True)
+    st.subheader("Detail Daftar Aktivitas & Beban Kuantitatif")
+    df_editor = pd.DataFrame(active_tasks)
+    st.dataframe(df_editor, use_container_width=True)
 
-# --- TAB 3: ANALISIS TLX ---
+# ------------------------------------------
+# TAB 3: ANALISIS PSIKOLOGIS TLX
+# ------------------------------------------
 with tab3:
-    st.subheader("Breakdown Profil 6 Dimensi Psikologis (NASA-TLX)")
-    
-    avg_md = edited_df['MD'].mean()
-    avg_pd = edited_df['PD'].mean()
-    avg_td = edited_df['TD'].mean()
-    avg_op = 100 - edited_df['OP'].mean()
-    avg_ef = edited_df['EF'].mean()
-    avg_fr = edited_df['FR'].mean()
-    
-    df_radar = pd.DataFrame({
-        'Dimensi': ['Mental Demand', 'Physical Demand', 'Temporal Demand', 'Performance (Inversed)', 'Effort', 'Frustration'],
-        'Skor': [avg_md, avg_pd, avg_td, avg_op, avg_ef, avg_fr]
-    })
-    
-    fig_radar = px.line_polar(df_radar, r='Skor', theta='Dimensi', line_close=True)
-    fig_radar.update_traces(fill='toself', fillcolor='rgba(0, 102, 102, 0.4)', line_color='#006666')
-    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])))
-    
-    st.plotly_chart(fig_radar, use_container_width=True)
+    st.subheader("Rincian Evaluasi 6 Dimensi NASA-TLX")
+    if active_tasks:
+        df_tlx_detail = pd.DataFrame(active_tasks)[["Task", "MD", "PD", "TD", "OP", "EF", "FR"]]
+        st.dataframe(df_tlx_detail, use_container_width=True)
 
-# --- TAB 4: LAPORAN MANAGERIAL ---
+# ------------------------------------------
+# TAB 4: LAPORAN MANAJERIAL
+# ------------------------------------------
 with tab4:
-    st.subheader("📄 Laporan Rekomendasi Managerial Otomatis")
+    st.subheader("Rekomendasi & Intervensi Manajerial")
+    st.markdown(f"**Diagnosis Posisi:** {kuadran_text}")
     
-    st.markdown(f"""
-    ### **HASIL ANALISIS UNTUK JABATAN: GUDANG FURNITURE**
-    * **Status FTE Kuantitatif:** {total_fte:.4f} (FIT / OPTIMAL)
-    * **Status Stres Psikologis:** {avg_rtl:.2f} (BEBAN MENTAL TINGGI)
-    * **Diagnosis:** **{kuadran}**
-    
-    ---
-    
-    #### **REKOMENDASI INTERVENSI STRATEGIS:**
-    1. **Digitalisasi Verifikasi Dokumen:** Terapkan *Barcode Scanner* untuk menekan ketidaksesuaian Surat Jalan vs Fisik Barang (*Menurunkan Mental Demand & Frustration*).
-    2. **Otomasi Alat Kerja:** Sediakan perkakas listrik (*power tools*) untuk rakitan lemari ekspedisi Lalamove (*Menurunkan Physical Demand & Effort*).
-    3. **Penataan Shift Malam:** Berikan kompensasi *off-shift* pagi setelah tugas insidental bongkar muat malam hari ($22.00 - 24.00$).
-    """)
-
-st.sidebar.markdown("---")
-st.sidebar.success("Aplikasi HWAS Siap Digunakan!")
-st.sidebar.markdown("---")
-st.sidebar.caption("© 2026 HWAS Assessment Tool")
-st.sidebar.caption("Dikembangkan oleh Sarah Saputri dan Tim, 2026")
+    if total_fte > 1.28:
+        st.error("⚠️ **Rekomendasi Beban Fisik:** Posisi ini mengalami *Overload*. Diperlukan rekrutmen SDM tambahan atau redistribusi alur kerja.")
+    elif total_fte < 1.00:
+        st.warning("ℹ️ **Rekomendasi Beban Fisik:** Posisi ini *Under-utilized*. Lakukan *job enrichment* atau penambahan cakupan tugas.")
+    else:
+        st.success("✅ **Rekomendasi Beban Fisik:** Kapasitas fisik berada pada rentang ideal.")
+        
+    if skor_tlx_avg > 66.66:
+        st.error("⚠️ **Rekomendasi Beban Mental:** Stres psikologis tinggi. Lakukan evaluasi birokrasi, otomatisasi sistem, atau perbaikan sarana kerja.")
+    else:
+        st.success("✅ **Rekomendasi Beban Mental:** Tingkat stres psikologis dalam kondisi wajar/terkendali.")
