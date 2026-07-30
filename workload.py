@@ -439,3 +439,112 @@ with tab4:
             file_name="Laporan_Manajerial_Komprehensif_HWAS.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+# ------------------------------------------
+# TAB 5: BEBAN KERJA HARIAN & INSIDENTAL
+# ------------------------------------------
+with tab5:
+    st.subheader("📅 Analisis Simulasikan Beban Kerja Harian & Tugas Insidental")
+    st.caption("Evaluasi kecukupan waktu kerja harian pekerja (Kapasitas Efektif = 408 Menit / 6.8 Jam per Hari).")
+
+    # Parameter Batas Harian
+    kapasitas_harian_efektif = (8 * 60) * allowance  # Contoh: 480 * 0.85 = 408 Menit/Hari
+
+    # 1. Simulator Filter Tugas Insidental
+    st.markdown("### 🛠️ Fitur Simulator Tugas Insidental")
+    st.info("Pilih tugas insidental / tambahan bulanan yang terjadi pada hari evaluasi untuk melihat dampaknya pada jam kerja harian.")
+
+    # Ambil list tugas dan klasifikasikan berdasarkan basis waktu
+    rutin_harian = []
+    insidental_periodik = []
+
+    for task in active_tasks:
+        b = str(task["Basis"]).lower()
+        if "hari" in b:
+            rutin_harian.append(task)
+        else:
+            insidental_periodik.append(task)
+
+    # 2. Hitung Menit Kerja Rutin Harian
+    menit_rutin_harian = sum(t["Durasi"] * t["Freq"] for t in rutin_harian)
+
+    # 3. Interaktif Checkbox untuk Tugas Non-Harian / Insidental
+    menit_insidental_terpilih = 0
+    tugas_insidental_diaktifkan = []
+
+    if insidental_periodik:
+        st.write("**Daftar Tugas Tambahan / Periodik / Insidental Tersedia:**")
+        cols = st.columns(2)
+        for idx, task in enumerate(insidental_periodik):
+            col_target = cols[idx % 2]
+            with col_target:
+                b = str(task["Basis"]).lower()
+                # Hitung durasi jika terjadi hari ini
+                durasi_kejadian = task["Durasi"] * task["Freq"]
+                
+                is_active = st.checkbox(
+                    f"📌 **{task['Task']}** (+{durasi_kejadian} Menit) [{task['Basis']}]",
+                    key=f"incidental_{idx}"
+                )
+                if is_active:
+                    menit_insidental_terpilih += durasi_kejadian
+                    tugas_insidental_diaktifkan.append(task["Task"])
+    else:
+        st.write("Sistem tidak mendeteksi tugas insidental/non-harian dalam dataset.")
+
+    # 4. Ringkasan Total Menit Harian
+    total_menit_hari_ini = menit_rutin_harian + menit_insidental_terpilih
+    total_jam_hari_ini = total_menit_hari_ini / 60.0
+    rasio_beban_harian = (total_menit_hari_ini / kapasitas_harian_efektif) * 100
+
+    st.markdown("---")
+    st.markdown("### 📊 Status Alokasi Waktu Kerja Hari Ini")
+
+    col_h1, col_h2, col_h3 = st.columns(3)
+    with col_h1:
+        st.metric(
+            label="Beban Kerja Rutin Harian",
+            value=f"{menit_rutin_harian} Menit",
+            delta=f"{(menit_rutin_harian/60):.2f} Jam"
+        )
+    with col_h2:
+        st.metric(
+            label="Tambahan Insidental Hari Ini",
+            value=f"{menit_insidental_terpilih} Menit",
+            delta=f"{(menit_insidental_terpilih/60):.2f} Jam" if menit_insidental_terpilih > 0 else "0 Jam"
+        )
+    with col_h3:
+        st.metric(
+            label="Total Durasi Kerja Hari Ini",
+            value=f"{total_menit_hari_ini} Menit",
+            delta=f"{(total_jam_hari_ini):.2f} Jam / Max {kapasitas_harian_efektif/60:.1f} Jam",
+            delta_color="inverse" if total_menit_hari_ini > kapasitas_harian_efektif else "normal"
+        )
+
+    # Progress Bar Kapasitas
+    st.write(f"**Tingkat Penggunaan Kapasitas Harian:** {rasio_beban_harian:.1f}% dari batas efektif ({kapasitas_harian_efektif:.0f} Menit)")
+    
+    if total_menit_hari_ini > kapasitas_harian_efektif:
+        kelebihan_menit = total_menit_hari_ini - kapasitas_harian_efektif
+        st.error(f"🚨 **OVERLOAD HARIAN!** Pekerja mengalami kelebihan waktu kerja sebesar **{kelebihan_menit:.0f} Menit ({kelebihan_menit/60:.2f} Jam)**. Diperlukan kerja lembur atau pembagian tugas insidental ke staf lain.")
+    elif total_menit_hari_ini >= (kapasitas_harian_efektif * 0.85):
+        st.warning("⚠️ **KAPASITAS OPTIMAL / PADAT.** Beban kerja harian mendekati batas maksimum efisiensi.")
+    else:
+        sisa_menit = kapasitas_harian_efektif - total_menit_hari_ini
+        st.success(f"✅ **KAPASITAS LONGGAR.** Pekerja masih memiliki sisa alokasi waktu efektif sebanyak **{sisa_menit:.0f} Menit ({sisa_menit/60:.2f} Jam)** hari ini.")
+
+    # 5. Export Rekap Harian ke Excel
+    st.markdown("---")
+    df_harian_export = pd.DataFrame([
+        {"Komponen": "Kapasitas Efektif Harian", "Menit": kapasitas_harian_efektif, "Jam": kapasitas_harian_efektif/60},
+        {"Komponen": "Beban Rutin Harian", "Menit": menit_rutin_harian, "Jam": menit_rutin_harian/60},
+        {"Komponen": "Tambahan Insidental Terpilih", "Menit": menit_insidental_terpilih, "Jam": menit_insidental_terpilih/60},
+        {"Komponen": "Total Beban Kerja Hari Ini", "Menit": total_menit_hari_ini, "Jam": total_jam_hari_ini},
+        {"Komponen": "Status Harian", "Menit": f"{rasio_beban_harian:.1f}% Utilized", "Jam": "OVERLOAD" if total_menit_hari_ini > kapasitas_harian_efektif else "NORMAL"}
+    ])
+
+    st.download_button(
+        label="📥 Unduh Simulasi Beban Harian (.xlsx)",
+        data=convert_df_to_excel(df_harian_export),
+        file_name="Simulasi_Beban_Kerja_Harian_dan_Insidental.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
