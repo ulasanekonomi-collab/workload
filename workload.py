@@ -625,4 +625,4 @@ st.sidebar.markdown(
     "Dikembangkan oleh <b>Sarah Saputri & Tim</b>, 2026"
     "</div>", 
     unsafe_allow_html=True
-)
+) 
