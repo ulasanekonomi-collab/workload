@@ -518,7 +518,7 @@ with tab5:
             })
             st.success(f"✅ Tugas '{nama_tugas_baru}' berhasil ditambahkan ke simulasi harian!")
 
-    # Tampilkan Daftar Tugas Ad-Hoc yang telah diinput user
+    # 3. Tampilkan Daftar Tugas Ad-Hoc & Hitung Menitnya
     menit_custom_insidental = 0
     if st.session_state.custom_incidental_tasks:
         st.write("**Daftar Tugas Tambahan Baru Hari Ini:**")
@@ -557,10 +557,11 @@ with tab5:
             delta=f"{(menit_insidental_master/60):.2f} Jam" if menit_insidental_master > 0 else "0 Jam"
         )
     with col_h3:
+        # Menggunakan nama variabel yang sudah disesuaikan (menit_custom_insidental)
         st.metric(
             label="Tugas Ad-Hoc Baru",
-            value=f"{menit_custom_incidental} Mnt",
-            delta=f"{(menit_custom_incidental/60):.2f} Jam" if menit_custom_incidental > 0 else "0 Jam"
+            value=f"{menit_custom_insidental} Mnt",
+            delta=f"{(menit_custom_insidental/60):.2f} Jam" if menit_custom_insidental > 0 else "0 Jam"
         )
     with col_h4:
         st.metric(
