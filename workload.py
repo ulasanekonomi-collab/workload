@@ -604,25 +604,24 @@ with tab5:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 # ------------------------------------------
-# FOOTER SIDEBAR: KREDIT & FOTO
+# FOOTER SIDEBAR: FOTO EKSTRA KECIL SEJAJAR TEKS
 # ------------------------------------------
 st.sidebar.markdown("---")
 
-# Menampilkan foto dari repository GitHub
-try:
-    st.sidebar.image(
-        "harapku-sarah-saputri.jpg", 
-        caption="Sarah Saputri", 
-        use_column_width=True
-    )
-except Exception:
-    # Handling jika file gambar belum/gagal terload
-    pass
+col_foto, col_teks = st.sidebar.columns([1, 4])
 
-# Menampilkan teks pengembang
-st.sidebar.markdown(
-    "<div style='text-align: center; color: #666; font-size: 0.85rem; padding-top: 5px;'>"
-    "Dikembangkan oleh <b>Sarah Saputri & Tim</b>, 2026"
-    "</div>", 
-    unsafe_allow_html=True
-) 
+with col_foto:
+    try:
+        # Menentukan lebar pasti gambar dalam piksel (width=45)
+        st.image("harapku-sarah-saputri.jpg", width=45)
+    except Exception:
+        st.write("📷")
+
+with col_teks:
+    st.markdown(
+        "<div style='font-size: 0.8rem; color: #555; line-height: 1.3; padding-top: 4px;'>"
+        "Dikembangkan oleh:<br>"
+        "<b>Sarah Saputri & Tim</b>, 2026"
+        "</div>", 
+        unsafe_allow_html=True
+    ) 
