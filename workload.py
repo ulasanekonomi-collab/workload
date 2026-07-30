@@ -471,6 +471,7 @@ with tab5:
 
     menit_rutin_harian = sum(t.get("Durasi", 0) * t.get("Freq", 0) for t in rutin_harian)
     menit_insidental_master = 0
+    tugas_insidental_diaktifkan = []
 
     if insidental_periodik:
         cols = st.columns(2)
@@ -484,6 +485,7 @@ with tab5:
                 )
                 if is_active:
                     menit_insidental_master += durasi_kejadian
+                    tugas_insidental_diaktifkan.append(task.get("Task"))
     else:
         st.write("*(Tidak ada tugas non-harian dalam Master Data)*")
 
@@ -518,7 +520,7 @@ with tab5:
             })
             st.success(f"✅ Tugas '{nama_tugas_baru}' berhasil ditambahkan ke simulasi harian!")
 
-    # 3. Tampilkan Daftar Tugas Ad-Hoc & Hitung Menitnya
+    # Tampilkan Daftar Tugas Ad-Hoc yang telah diinput user
     menit_custom_insidental = 0
     if st.session_state.custom_incidental_tasks:
         st.write("**Daftar Tugas Tambahan Baru Hari Ini:**")
@@ -534,7 +536,7 @@ with tab5:
                     st.session_state.custom_incidental_tasks.pop(i)
                     st.rerun()
 
-    # 4. Kalkulasi Total & Dampak Kecepatan Harian
+    # 4. Kalkulasi Total & Ringkasan Real-Time
     total_insidental_keseluruhan = menit_insidental_master + menit_custom_insidental
     total_menit_hari_ini = menit_rutin_harian + total_insidental_keseluruhan
     total_jam_hari_ini = total_menit_hari_ini / 60.0
@@ -557,7 +559,6 @@ with tab5:
             delta=f"{(menit_insidental_master/60):.2f} Jam" if menit_insidental_master > 0 else "0 Jam"
         )
     with col_h3:
-        # Menggunakan nama variabel yang sudah disesuaikan (menit_custom_insidental)
         st.metric(
             label="Tugas Ad-Hoc Baru",
             value=f"{menit_custom_insidental} Mnt",
@@ -571,9 +572,9 @@ with tab5:
             delta_color="inverse" if total_menit_hari_ini > kapasitas_harian_efektif else "normal"
         )
 
-    # Indikator Status Kebijakan Manajerial
     st.write(f"**Tingkat Penggunaan Kapasitas Harian:** {rasio_beban_harian:.1f}%")
 
+    # Alert Box Status
     if total_menit_hari_ini > kapasitas_harian_efektif:
         kelebihan = total_menit_hari_ini - kapasitas_harian_efektif
         st.error(
@@ -586,80 +587,80 @@ with tab5:
         sisa = kapasitas_harian_efektif - total_menit_hari_ini
         st.success(f"✅ **KAPASITAS NORMAL.** Masih tersisa alokasi waktu efektif **{sisa:.0f} Menit ({sisa/60:.2f} Jam)**.")
 
-    # 5. EKSPOR SIMULASI HARIAN LENGKAP BERSAMA RINCIAN TUGAS (.XLSX)
-        st.markdown("---")
-        st.markdown("### 📥 Unduh Hasil Simulasi & Rincian Tugas Harian")
+    # 5. SEKSI EKSPOR EXCEL HARIAN (SELALU MUNCUL DI PALING BAWAH TAB 5)
+    st.markdown("---")
+    st.markdown("### 📥 Unduh Hasil Simulasi & Rincian Tugas Harian")
 
-        # A. Tabel Summary Beban Kerja Harian
-        df_harian_summary = pd.DataFrame([
-            {"Indikator Harian": "Kapasitas Efektif Harian (Standard)", "Nilai (Menit)": kapasitas_harian_efektif, "Nilai (Jam)": round(kapasitas_harian_efektif/60, 2)},
-            {"Indikator Harian": "Beban Rutin Harian", "Nilai (Menit)": menit_rutin_harian, "Nilai (Jam)": round(menit_rutin_harian/60, 2)},
-            {"Indikator Harian": "Tambahan Insidental (Master Data)", "Nilai (Menit)": menit_insidental_master, "Nilai (Jam)": round(menit_insidental_master/60, 2)},
-            {"Indikator Harian": "Tugas Ad-Hoc Baru (Input User)", "Nilai (Menit)": menit_custom_insidental, "Nilai (Jam)": round(menit_custom_insidental/60, 2)},
-            {"Indikator Harian": "TOTAL BEBAN KERJA HARI INI", "Nilai (Menit)": total_menit_hari_ini, "Nilai (Jam)": round(total_jam_hari_ini, 2)},
-            {"Indikator Harian": "Status Utilisasi Kapasitas", "Nilai (Menit)": f"{rasio_beban_harian:.1f}%", "Nilai (Jam)": "OVERLOAD" if total_menit_hari_ini > kapasitas_harian_efektif else "NORMAL"}
-        ])
+    # A. Tabel Summary Beban Kerja Harian
+    df_harian_summary = pd.DataFrame([
+        {"Indikator Harian": "Kapasitas Efektif Harian (Standard)", "Nilai (Menit)": kapasitas_harian_efektif, "Nilai (Jam)": round(kapasitas_harian_efektif/60, 2)},
+        {"Indikator Harian": "Beban Rutin Harian", "Nilai (Menit)": menit_rutin_harian, "Nilai (Jam)": round(menit_rutin_harian/60, 2)},
+        {"Indikator Harian": "Tambahan Insidental (Master Data)", "Nilai (Menit)": menit_insidental_master, "Nilai (Jam)": round(menit_insidental_master/60, 2)},
+        {"Indikator Harian": "Tugas Ad-Hoc Baru (Input User)", "Nilai (Menit)": menit_custom_insidental, "Nilai (Jam)": round(menit_custom_insidental/60, 2)},
+        {"Indikator Harian": "TOTAL BEBAN KERJA HARI INI", "Nilai (Menit)": total_menit_hari_ini, "Nilai (Jam)": round(total_jam_hari_ini, 2)},
+        {"Indikator Harian": "Status Utilisasi Kapasitas", "Nilai (Menit)": f"{rasio_beban_harian:.1f}%", "Nilai (Jam)": "OVERLOAD" if total_menit_hari_ini > kapasitas_harian_efektif else "NORMAL"}
+    ])
 
-        # B. Tabel Rincian Tugas yang Aktif Hari Ini
-        rincian_tugas_hari_ini = []
+    # B. Tabel Rincian Tugas yang Aktif Hari Ini
+    rincian_tugas_hari_ini = []
 
-        # 1. Masukkan Tugas Rutin Harian
-        for r_task in rutin_harian:
-            tot_m = r_task.get("Durasi", 0) * r_task.get("Freq", 0)
+    # 1. Masukkan Tugas Rutin Harian
+    for r_task in rutin_harian:
+        tot_m = r_task.get("Durasi", 0) * r_task.get("Freq", 0)
+        rincian_tugas_hari_ini.append({
+            "Kategori Tugas": "Rutin Harian",
+            "Deskripsi Tugas": r_task.get("Task", "-"),
+            "Durasi (Menit)": r_task.get("Durasi", 0),
+            "Frekuensi": r_task.get("Freq", 0),
+            "Total Menit Hari Ini": tot_m,
+            "Estimasi Stres Mental": r_task.get("MD", 50)
+        })
+
+    # 2. Masukkan Tugas Insidental Master Data yang Dicentang
+    for task_name in tugas_insidental_diaktifkan:
+        match_task = next((t for t in insidental_periodik if t.get("Task") == task_name), None)
+        if match_task:
+            tot_m = match_task.get("Durasi", 0) * match_task.get("Freq", 0)
             rincian_tugas_hari_ini.append({
-                "Kategori Tugas": "Rutin Harian",
-                "Deskripsi Tugas": r_task.get("Task", "-"),
-                "Durasi (Menit)": r_task.get("Durasi", 0),
-                "Frekuensi": r_task.get("Freq", 0),
+                "Kategori Tugas": "Insidental (Master Data)",
+                "Deskripsi Tugas": match_task.get("Task", "-"),
+                "Durasi (Menit)": match_task.get("Durasi", 0),
+                "Frekuensi": match_task.get("Freq", 0),
                 "Total Menit Hari Ini": tot_m,
-                "Estimasi Stres Mental": r_task.get("MD", 50)
+                "Estimasi Stres Mental": match_task.get("MD", 50)
             })
 
-        # 2. Masukkan Tugas Insidental Master Data yang Dicentang
-        for task_name in tugas_insidental_diaktifkan:
-            match_task = next((t for t in insidental_periodik if t.get("Task") == task_name), None)
-            if match_task:
-                tot_m = match_task.get("Durasi", 0) * match_task.get("Freq", 0)
-                rincian_tugas_hari_ini.append({
-                    "Kategori Tugas": "Insidental (Master Data)",
-                    "Deskripsi Tugas": match_task.get("Task", "-"),
-                    "Durasi (Menit)": match_task.get("Durasi", 0),
-                    "Frekuensi": match_task.get("Freq", 0),
-                    "Total Menit Hari Ini": tot_m,
-                    "Estimasi Stres Mental": match_task.get("MD", 50)
-                })
+    # 3. Masukkan Tugas Ad-Hoc Baru Hasil Input User
+    if st.session_state.custom_incidental_tasks:
+        for c_task in st.session_state.custom_incidental_tasks:
+            rincian_tugas_hari_ini.append({
+                "Kategori Tugas": "Ad-Hoc Baru (Input Manual)",
+                "Deskripsi Tugas": c_task["Task"],
+                "Durasi (Menit)": c_task["Durasi"],
+                "Frekuensi": c_task["Freq"],
+                "Total Menit Hari Ini": c_task["TotalMenit"],
+                "Estimasi Stres Mental": c_task["MentalScore"]
+            })
 
-        # 3. Masukkan Tugas Ad-Hoc Baru Hasil Input User
-        if st.session_state.custom_incidental_tasks:
-            for c_task in st.session_state.custom_incidental_tasks:
-                rincian_tugas_hari_ini.append({
-                    "Kategori Tugas": "Ad-Hoc Baru (Input Manual)",
-                    "Deskripsi Tugas": c_task["Task"],
-                    "Durasi (Menit)": c_task["Durasi"],
-                    "Frekuensi": c_task["Freq"],
-                    "Total Menit Hari Ini": c_task["TotalMenit"],
-                    "Estimasi Stres Mental": c_task["MentalScore"]
-                })
+    df_rincian_harian_export = pd.DataFrame(rincian_tugas_hari_ini)
 
-        df_rincian_harian_export = pd.DataFrame(rincian_tugas_hari_ini)
+    # C. Helper Multi-Sheet Khusus Simulasi Harian
+    def export_harian_multisheet(df_summary, df_detail):
+        import io
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_summary.to_excel(writer, index=False, sheet_name='Ringkasan Harian')
+            df_detail.to_excel(writer, index=False, sheet_name='Daftar Tugas Aktif Hari Ini')
+        return output.getvalue()
 
-        # C. Helper Multi-Sheet Khusus Simulasi Harian
-        def export_harian_multisheet(df_summary, df_detail):
-            import io
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_summary.to_excel(writer, index=False, sheet_name='Ringkasan Harian')
-                df_detail.to_excel(writer, index=False, sheet_name='Daftar Tugas Aktif Hari Ini')
-            return output.getvalue()
-
-        # D. Tombol Unduh Excel Multi-Sheet
-        st.download_button(
-            label="📥 Unduh Simulasi & Rincian Tugas Harian (.xlsx)",
-            data=export_harian_multisheet(df_harian_summary, df_rincian_harian_export),
-            file_name="Simulasi_Beban_Kerja_dan_Rincian_Tugas_Harian.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+    # D. Tombol Download Excel Multi-Sheet
+    st.download_button(
+        label="📥 Unduh Simulasi & Rincian Tugas Harian (.xlsx)",
+        data=export_harian_multisheet(df_harian_summary, df_rincian_harian_export),
+        file_name="Simulasi_Beban_Kerja_dan_Rincian_Tugas_Harian.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 # ------------------------------------------
 # FOOTER SIDEBAR: FOTO EKSTRA KECIL SEJAJAR TEKS
 # ------------------------------------------
