@@ -443,23 +443,25 @@ with tab4:
 # TAB 5: BEBAN KERJA HARIAN & INSIDENTAL
 # ------------------------------------------
 with tab5:
-    st.subheader("📅 Analisis & Simulasi Beban Kerja Harian")
-    st.caption("Evaluasi kecukupan waktu kerja harian pekerja berdasarkan alokasi waktu efektif harian.")
+    st.subheader("📅 Analisis & Simulasi Beban Kerja Harian Interaktif")
+    st.caption("Evaluasi kecukupan waktu kerja harian pekerja berdasarkan tugas rutin, tugas insidental terdaftar, dan input tugas ad-hoc baru.")
 
     # 1. Parameter Batas Harian
-    # Standar Harian: (JKE Menit Pertahun) / (Hari Kerja Efektif Pertahun)
     kapasitas_harian_efektif = round(jke_menit_tahun / hari_kerja_efektif, 1) if hari_kerja_efektif > 0 else 408.0
 
-    st.info(f"💡 **Target Efektif Harian:** **{kapasitas_harian_efektif:.0f} Menit/Hari** ({kapasitas_harian_efektif/60:.2f} Jam/Hari)")
+    st.info(f"💡 **Target Efektif Harian Pekerja:** **{kapasitas_harian_efektif:.0f} Menit/Hari** ({kapasitas_harian_efektif/60:.2f} Jam/Hari)")
 
-    # 2. Simulator Filter Tugas Insidental & Non-Harian
-    st.markdown("### 🛠️ Simulator Tugas Tambahan / Insidental")
-    st.caption("Centang tugas non-harian yang terjadi pada hari ini untuk melihat lonjakan beban kerja.")
+    # Session State untuk menyimpan Tugas Tambahan / Ad-Hoc buatan user
+    if "custom_incidental_tasks" not in st.session_state:
+        st.session_state.custom_incidental_tasks = []
 
+    # 2. SEKSI A: Checklist Tugas Insidental dari Master Data
+    st.markdown("---")
+    st.markdown("### 1️⃣ Pilih Tugas Non-Harian dari Master Data")
+    
     rutin_harian = []
     insidental_periodik = []
 
-    # Filter jenis tugas
     for task in active_tasks:
         b = str(task.get("Basis", "")).lower()
         if "hari" in b:
@@ -467,15 +469,10 @@ with tab5:
         else:
             insidental_periodik.append(task)
 
-    # Menit Beban Rutin Harian
     menit_rutin_harian = sum(t.get("Durasi", 0) * t.get("Freq", 0) for t in rutin_harian)
-
-    # Interactive Checkbox Tugas Insidental
-    menit_insidental_terpilih = 0
-    tugas_insidental_diaktifkan = []
+    menit_insidental_master = 0
 
     if insidental_periodik:
-        st.write("**Daftar Tugas Non-Harian / Insidental yang Bisa Diaktifkan:**")
         cols = st.columns(2)
         for idx, task in enumerate(insidental_periodik):
             col_target = cols[idx % 2]
@@ -486,65 +483,122 @@ with tab5:
                     key=f"incidental_chk_{idx}"
                 )
                 if is_active:
-                    menit_insidental_terpilih += durasi_kejadian
-                    tugas_insidental_diaktifkan.append(task.get("Task"))
+                    menit_insidental_master += durasi_kejadian
     else:
-        st.write("*(Tidak ada tugas non-harian/insidental dalam daftar data)*")
+        st.write("*(Tidak ada tugas non-harian dalam Master Data)*")
 
-    # 3. Kalkulasi Ringkasan Total
-    total_menit_hari_ini = menit_rutin_harian + menit_insidental_terpilih
+    # 3. SEKSI B: Form Input Tugas Baru / Ad-Hoc di Luar Daftar
+    st.markdown("---")
+    st.markdown("### 2️⃣ Input Tugas Tambahan Baru (Di Luar Daftar Master)")
+    st.caption("Gunakan form ini jika pekerja menerima instruksi tugas mendadak/insidental baru hari ini.")
+
+    with st.form("form_tugas_baru", clear_on_submit=True):
+        col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
+        with col_f1:
+            nama_tugas_baru = st.text_input("Deskripsi / Nama Tugas Baru", placeholder="Misal: Unloading Kontainer Darurat")
+        with col_f2:
+            durasi_baru = st.number_input("Durasi (Menit)", min_value=1, value=30, step=5)
+        with col_f3:
+            freq_baru = st.number_input("Frekuensi (Kali)", min_value=1, value=1, step=1)
+
+        col_f4, col_f5 = st.columns(2)
+        with col_f4:
+            stres_mental = st.slider("Estimasi Stres Mental (NASA-TLX)", min_value=0, max_value=100, value=60, help="0 = Sangat Ringan, 100 = Ekstrem Sangat Berat")
+        with col_f5:
+            st.write("") # Spacing
+            btn_tambah = st.form_submit_button("➕ Tambahkan Tugas Insidental Ini", use_container_width=True)
+
+        if btn_tambah and nama_tugas_baru.strip():
+            st.session_state.custom_incidental_tasks.append({
+                "Task": nama_tugas_baru.strip(),
+                "Durasi": durasi_baru,
+                "Freq": freq_baru,
+                "TotalMenit": durasi_baru * freq_baru,
+                "MentalScore": stres_mental
+            })
+            st.success(f"✅ Tugas '{nama_tugas_baru}' berhasil ditambahkan ke simulasi harian!")
+
+    # Tampilkan Daftar Tugas Ad-Hoc yang telah diinput user
+    menit_custom_insidental = 0
+    if st.session_state.custom_incidental_tasks:
+        st.write("**Daftar Tugas Tambahan Baru Hari Ini:**")
+        for i, c_task in enumerate(st.session_state.custom_incidental_tasks):
+            tot = c_task["TotalMenit"]
+            menit_custom_insidental += tot
+            
+            c_col1, c_col2 = st.columns([4, 1])
+            with c_col1:
+                st.write(f"• **{c_task['Task']}** — {c_task['Durasi']} mnt x {c_task['Freq']}x = **{tot} Menit** (Beban Mental: {c_task['MentalScore']}/100)")
+            with c_col2:
+                if st.button("❌ Hapus", key=f"del_custom_{i}"):
+                    st.session_state.custom_incidental_tasks.pop(i)
+                    st.rerun()
+
+    # 4. Kalkulasi Total & Dampak Kecepatan Harian
+    total_insidental_keseluruhan = menit_insidental_master + menit_custom_insidental
+    total_menit_hari_ini = menit_rutin_harian + total_insidental_keseluruhan
     total_jam_hari_ini = total_menit_hari_ini / 60.0
     rasio_beban_harian = (total_menit_hari_ini / kapasitas_harian_efektif) * 100 if kapasitas_harian_efektif > 0 else 0
 
     st.markdown("---")
-    st.markdown("### 📊 Ringkasan Beban Kerja Hari Ini")
+    st.markdown("### 📊 Rekapitulasi Beban Kerja Harian (Real-Time)")
 
-    col_h1, col_h2, col_h3 = st.columns(3)
+    col_h1, col_h2, col_h3, col_h4 = st.columns(4)
     with col_h1:
         st.metric(
             label="Beban Rutin Harian",
-            value=f"{menit_rutin_harian} Menit",
+            value=f"{menit_rutin_harian} Mnt",
             delta=f"{(menit_rutin_harian/60):.2f} Jam"
         )
     with col_h2:
         st.metric(
-            label="Tambahan Insidental",
-            value=f"{menit_insidental_terpilih} Menit",
-            delta=f"{(menit_insidental_terpilih/60):.2f} Jam" if menit_insidental_terpilih > 0 else "0 Jam"
+            label="Insidental Master Data",
+            value=f"{menit_insidental_master} Mnt",
+            delta=f"{(menit_insidental_master/60):.2f} Jam" if menit_insidental_master > 0 else "0 Jam"
         )
     with col_h3:
         st.metric(
-            label="Total Waktu Hari Ini",
-            value=f"{total_menit_hari_ini} Menit",
-            delta=f"{(total_jam_hari_ini):.2f} Jam / Max {kapasitas_harian_efektif/60:.1f} Jam",
+            label="Tugas Ad-Hoc Baru",
+            value=f"{menit_custom_incidental} Mnt",
+            delta=f"{(menit_custom_incidental/60):.2f} Jam" if menit_custom_incidental > 0 else "0 Jam"
+        )
+    with col_h4:
+        st.metric(
+            label="TOTAL WAKTU KERJA",
+            value=f"{total_menit_hari_ini} Mnt",
+            delta=f"{total_jam_hari_ini:.2f} Jam / Target {kapasitas_harian_efektif/60:.1f} Jam",
             delta_color="inverse" if total_menit_hari_ini > kapasitas_harian_efektif else "normal"
         )
 
-    # Status & Gauge Indicator
+    # Indikator Status Kebijakan Manajerial
     st.write(f"**Tingkat Penggunaan Kapasitas Harian:** {rasio_beban_harian:.1f}%")
 
     if total_menit_hari_ini > kapasitas_harian_efektif:
-        kelebihan_menit = total_menit_hari_ini - kapasitas_harian_efektif
-        st.error(f"🚨 **OVERLOAD HARIAN!** Terdapat kelebihan waktu kerja sebesar **{kelebihan_menit:.0f} Menit ({kelebihan_menit/60:.2f} Jam)**. Perlu redistribusi tugas atau lembur.")
+        kelebihan = total_menit_hari_ini - kapasitas_harian_efektif
+        st.error(
+            f"🚨 **OVERLOAD HARIAN!** Total pengerjaan tugas melebihi kapasitas kerja efektif sebesar **{kelebihan:.0f} Menit ({kelebihan/60:.2f} Jam)**.\n\n"
+            f"💡 **Rekomendasi:** Disarankan membayar **Lembur Insidental ({kelebihan/60:.2f} Jam)** atau mengalihkan tugas ad-hoc ke stasiun kerja lain."
+        )
     elif total_menit_hari_ini >= (kapasitas_harian_efektif * 0.85):
-        st.warning("⚠️ **KAPASITAS OPTIMAL / PADAT.** Beban harian mendekati batas kapasitas efektif.")
+        st.warning("⚠️ **KAPASITAS PADAT.** Pekerja beroperasi mendekati ambang batas kelelahan harian.")
     else:
-        sisa_menit = kapasitas_harian_efektif - total_menit_hari_ini
-        st.success(f"✅ **KAPASITAS NORMAL.** Masih tersedia sisa waktu efektif **{sisa_menit:.0f} Menit ({sisa_menit/60:.2f} Jam)**.")
+        sisa = kapasitas_harian_efektif - total_menit_hari_ini
+        st.success(f"✅ **KAPASITAS NORMAL.** Masih tersisa alokasi waktu efektif **{sisa:.0f} Menit ({sisa/60:.2f} Jam)**.")
 
-    # 4. Unduh Laporan Simulasi Harian
+    # 5. Tombol Unduh Laporan Simulasi Harian Lengkap
     st.markdown("---")
     df_harian_export = pd.DataFrame([
-        {"Komponen": "Kapasitas Efektif Harian", "Menit": kapasitas_harian_efektif, "Jam": kapasitas_harian_efektif/60},
-        {"Komponen": "Beban Rutin Harian", "Menit": menit_rutin_harian, "Jam": menit_rutin_harian/60},
-        {"Komponen": "Tambahan Insidental Terpilih", "Menit": menit_insidental_terpilih, "Jam": menit_insidental_terpilih/60},
-        {"Komponen": "Total Beban Kerja Hari Ini", "Menit": total_menit_hari_ini, "Jam": total_jam_hari_ini},
-        {"Komponen": "Status Harian", "Menit": f"{rasio_beban_harian:.1f}% Utilized", "Jam": "OVERLOAD" if total_menit_hari_ini > kapasitas_harian_efektif else "NORMAL"}
+        {"Komponen": "Kapasitas Efektif Harian Standard", "Menit": kapasitas_harian_efektif, "Jam": round(kapasitas_harian_efektif/60, 2)},
+        {"Komponen": "Tugas Rutin Harian", "Menit": menit_rutin_harian, "Jam": round(menit_rutin_harian/60, 2)},
+        {"Komponen": "Tugas Insidental Master Data", "Menit": menit_insidental_master, "Jam": round(menit_insidental_master/60, 2)},
+        {"Komponen": "Tugas Ad-Hoc Baru (Input User)", "Menit": menit_custom_insidental, "Jam": round(menit_custom_insidental/60, 2)},
+        {"Komponen": "TOTAL BEBAN KERJA HARI INI", "Menit": total_menit_hari_ini, "Jam": round(total_jam_hari_ini, 2)},
+        {"Komponen": "Status Utilisasi Kapasitas", "Menit": f"{rasio_beban_harian:.1f}%", "Jam": "OVERLOAD" if total_menit_hari_ini > kapasitas_harian_efektif else "NORMAL"}
     ])
 
     st.download_button(
-        label="📥 Unduh Simulasi Beban Harian (.xlsx)",
+        label="📥 Unduh Simulasi Beban Harian & Ad-Hoc (.xlsx)",
         data=convert_df_to_excel(df_harian_export),
-        file_name="Simulasi_Beban_Kerja_Harian.xlsx",
+        file_name="Simulasi_Beban_Harian_dan_AdHoc.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
