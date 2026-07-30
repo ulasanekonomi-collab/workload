@@ -603,3 +603,26 @@ with tab5:
         file_name="Simulasi_Beban_Harian_dan_AdHoc.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+# ------------------------------------------
+# FOOTER SIDEBAR: KREDIT & FOTO
+# ------------------------------------------
+st.sidebar.markdown("---")
+
+# Menampilkan foto dari repository GitHub
+try:
+    st.sidebar.image(
+        "harapku-sarah-saputri.jpg", 
+        caption="Sarah Saputri", 
+        use_column_width=True
+    )
+except Exception:
+    # Handling jika file gambar belum/gagal terload
+    pass
+
+# Menampilkan teks pengembang
+st.sidebar.markdown(
+    "<div style='text-align: center; color: #666; font-size: 0.85rem; padding-top: 5px;'>"
+    "Dikembangkan oleh <b>Sarah Saputri & Tim</b>, 2026"
+    "</div>", 
+    unsafe_allow_html=True
+)
