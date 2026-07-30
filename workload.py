@@ -187,11 +187,13 @@ else:
 # ==========================================
 # 6. STRUCTURING TABS UNTUK INTERFACE
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs([
+# Pembagian Tab (Tambahkan Tab 5)
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Executive Dashboard", 
     "📝 Input & Data Editor", 
     "🧠 Analisis Psikologis TLX", 
-    "📋 Laporan Manajerial"
+    "📋 Laporan Manajerial",
+    "📅 Beban Kerja Harian & Insidental"  # Tab Baru
 ])
 
 # ------------------------------------------
